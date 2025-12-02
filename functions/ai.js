@@ -109,7 +109,9 @@ export async function onRequest({ request, env }) {
       bytes[i] = binaryString.charCodeAt(i);
     }
 
-    const filename = `gemini_${Date.now()}.png`;
+    const extension = generatedMimeType.split("/")[1] || "png";
+    const filename = `gemini_${Date.now()}.${extension}`;
+
     await env.IMAGE_BUCKET.put(filename, bytes, {
       httpMetadata: { contentType: generatedMimeType },
     });
