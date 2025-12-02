@@ -97,7 +97,7 @@ export async function onRequest({ request, env }) {
 
     if (!generatedImageBase64) {
       console.error("No image found in Gemini response:", JSON.stringify(data, null, 2));
-      throw new Error(`Gemini did not return an image. Response: ${JSON.stringify(data)}`);
+      throw new Error(`[v3-10:45] Gemini did not return an image. Response: ${JSON.stringify(data)}`);
     }
 
     // Upload to R2
