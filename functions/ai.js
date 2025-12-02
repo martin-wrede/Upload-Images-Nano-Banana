@@ -88,16 +88,17 @@ export async function onRequest({ request, env }) {
     let generatedMimeType = "image/png";
 
     for (const part of parts) {
-      if (part.inline_data) {
-        generatedImageBase64 = part.inline_data.data;
-        generatedMimeType = part.inline_data.mime_type || "image/png";
+      const inlineData = part.inline_data || part.inlineData;
+      if (inlineData) {
+        generatedImageBase64 = inlineData.data;
+        generatedMimeType = inlineData.mime_type || inlineData.mimeType || "image/png";
         break;
       }
     }
 
     if (!generatedImageBase64) {
       console.error("No image found in Gemini response:", JSON.stringify(data, null, 2));
-      throw new Error(`[v3-10:45] Gemini did not return an image. Response: ${JSON.stringify(data)}`);
+      throw new Error(`[v4-11:05] Gemini did not return an image. Response: ${JSON.stringify(data)}`);
     }
 
     // Upload to R2
