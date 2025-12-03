@@ -90,6 +90,7 @@ function App() {
       const formData = new FormData();
       formData.append('prompt', prompt);
       formData.append('image', selectedFile);
+      formData.append('email', email);
       formData.append('user', 'User123');
       body = formData;
 
