@@ -215,13 +215,20 @@ function App() {
         </div>
       )}
 
-      <input
-        type="text"
+      <textarea
         placeholder="Enter your prompt to modify the image"
         value={prompt}
         onChange={e => setPrompt(e.target.value)}
         disabled={selectedImageIndex === ""}
-        style={{ padding: '0.5rem', width: '300px', backgroundColor: selectedImageIndex === "" ? '#f0f0f0' : 'white' }}
+        rows={4}
+        style={{
+          padding: '0.5rem',
+          width: '300px',
+          backgroundColor: selectedImageIndex === "" ? '#f0f0f0' : 'white',
+          fontFamily: 'Arial, sans-serif',
+          fontSize: '14px',
+          resize: 'vertical'
+        }}
       />
       <button
         onClick={generateImage}
