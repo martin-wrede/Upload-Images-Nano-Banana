@@ -43,6 +43,25 @@ export async function onRequest({ request, env }) {
       new Uint8Array(arrayBuffer).reduce((data, byte) => data + String.fromCharCode(byte), "")
     );
 
+    // Detect image orientation for aspect ratio
+    let aspectRatio = "16:9"; // Default to landscape
+    try {
+      const blob = new Blob([arrayBuffer], { type: imageFile.type });
+      const imageBitmap = await createImageBitmap(blob);
+      const width = imageBitmap.width;
+      const height = imageBitmap.height;
+
+      if (height > width) {
+        aspectRatio = "9:16"; // Portrait
+      } else {
+        aspectRatio = "16:9"; // Landscape
+      }
+
+      console.log(`📐 Detected image dimensions: ${width}x${height}, using aspect ratio: ${aspectRatio}`);
+    } catch (error) {
+      console.warn("⚠️ Could not detect image dimensions, using default 16:9:", error);
+    }
+
     // Gemini API Endpoint
     const GEMINI_API_KEY = env.GEMINI_API_KEY;
     const MODEL = "gemini-3-pro-image-preview"; // Or "gemini-2.5-flash-image" if preferred/available
@@ -65,6 +84,10 @@ export async function onRequest({ request, env }) {
       ],
       generationConfig: {
         responseModalities: ["TEXT", "IMAGE"],
+        imageConfig: {
+          aspectRatio: aspectRatio,
+          imageSize: "2K",
+        },
       },
     };
 
