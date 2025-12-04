@@ -51,22 +51,56 @@ export async function onRequest({ request, env }) {
     );
 
     // Detect image orientation for aspect ratio
+    // Note: createImageBitmap is not available in Cloudflare Workers
+    // We'll read dimensions from image file headers instead
     let aspectRatio = "16:9"; // Default to landscape
     try {
-      const blob = new Blob([arrayBuffer], { type: imageFile.type });
-      const imageBitmap = await createImageBitmap(blob);
-      const width = imageBitmap.width;
-      const height = imageBitmap.height;
+      const uint8Array = new Uint8Array(arrayBuffer);
+      let width = 0;
+      let height = 0;
 
-      if (height > width) {
-        aspectRatio = "9:16"; // Portrait
-      } else {
-        aspectRatio = "16:9"; // Landscape
+      // Detect image type and extract dimensions
+      if (uint8Array[0] === 0xFF && uint8Array[1] === 0xD8) {
+        // JPEG
+        let offset = 2;
+        while (offset < uint8Array.length) {
+          if (uint8Array[offset] !== 0xFF) break;
+          const marker = uint8Array[offset + 1];
+          if (marker === 0xC0 || marker === 0xC2) {
+            height = (uint8Array[offset + 5] << 8) | uint8Array[offset + 6];
+            width = (uint8Array[offset + 7] << 8) | uint8Array[offset + 8];
+            break;
+          }
+          offset += 2 + ((uint8Array[offset + 2] << 8) | uint8Array[offset + 3]);
+        }
+      } else if (uint8Array[0] === 0x89 && uint8Array[1] === 0x50 && uint8Array[2] === 0x4E && uint8Array[3] === 0x47) {
+        // PNG
+        width = (uint8Array[16] << 24) | (uint8Array[17] << 16) | (uint8Array[18] << 8) | uint8Array[19];
+        height = (uint8Array[20] << 24) | (uint8Array[21] << 16) | (uint8Array[22] << 8) | uint8Array[23];
+      } else if (uint8Array[0] === 0x47 && uint8Array[1] === 0x49 && uint8Array[2] === 0x46) {
+        // GIF
+        width = uint8Array[6] | (uint8Array[7] << 8);
+        height = uint8Array[8] | (uint8Array[9] << 8);
+      } else if (uint8Array[0] === 0x52 && uint8Array[1] === 0x49 && uint8Array[2] === 0x46 && uint8Array[3] === 0x46) {
+        // WebP
+        if (uint8Array[12] === 0x56 && uint8Array[13] === 0x50 && uint8Array[14] === 0x38) {
+          width = ((uint8Array[26] | (uint8Array[27] << 8) | (uint8Array[28] << 16)) & 0x3FFF) + 1;
+          height = ((uint8Array[29] | (uint8Array[30] << 8) | (uint8Array[31] << 16)) & 0x3FFF) + 1;
+        }
       }
 
-      console.log(`📐 Detected image dimensions: ${width}x${height}, using aspect ratio: ${aspectRatio}`);
+      if (width > 0 && height > 0) {
+        if (height > width) {
+          aspectRatio = "9:16"; // Portrait
+        } else {
+          aspectRatio = "16:9"; // Landscape
+        }
+        console.log(`📐 Detected image dimensions: ${width}x${height}, using aspect ratio: ${aspectRatio}`);
+      } else {
+        console.warn("⚠️ Could not detect image dimensions from headers, using default 16:9");
+      }
     } catch (error) {
-      console.warn("⚠️ Could not detect image dimensions, using default 16:9:", error);
+      console.warn("⚠️ Error detecting image dimensions, using default 16:9:", error);
     }
 
     // Gemini API Endpoint
