@@ -16,7 +16,7 @@ function App() {
   const [results, setResults] = useState([]);
   const [variationCount, setVariationCount] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
-  const [isUploading, setIsUploading] = useState(false);
+  const [loadingImages, setLoadingImages] = useState(false);
 
   // Get package from URL query parameter
   const queryParams = new URLSearchParams(window.location.search);
@@ -25,52 +25,49 @@ function App() {
 
   const [selectedImageIndex, setSelectedImageIndex] = useState("");
 
-  const handleFileChange = (e) => {
-    const selectedFiles = [...e.target.files];
-    if (selectedFiles.length > currentPackage.limit) {
-      alert(`You can only upload a maximum of ${currentPackage.limit} images for the ${currentPackage.title}.`);
-      // Reset the input value so the user can try again
-      e.target.value = '';
-      setFiles([]);
-    } else {
-      setFiles(selectedFiles);
+  // Load images from R2 folder
+  const loadImagesFromR2 = async () => {
+    if (!email) {
+      alert('Please enter your email');
+      return;
     }
-  };
 
-  const handleUpload = async () => {
-    setIsUploading(true);
+    setLoadingImages(true);
     try {
-      const formData = new FormData();
-      formData.append('name', name);
-      formData.append('email', email);
-      formData.append('uploadColumn', currentPackage.column); // Send target column
-
-      files.forEach((file) => {
-        formData.append('images', file);
-      });
-
-      const response = await fetch('/upload_images', {
+      // Call list-images endpoint
+      const response = await fetch('/list-images', {
         method: 'POST',
-        body: formData, // Send FormData directly
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
       });
-
-      const result = await response.json();
 
       if (!response.ok) {
-        if (response.status === 403) {
-          alert(result.error);
-          return;
-        }
-        throw new Error(result.error || "Upload failed");
+        throw new Error('Failed to load images from R2');
       }
 
-      console.log("✅ Uploaded to Airtable:", result);
-      alert("Upload successful!");
+      const data = await response.json();
+
+      if (data.images.length === 0) {
+        alert('No images found in your folder. Please upload images first.');
+        return;
+      }
+
+      // Convert R2 images to File objects
+      const filePromises = data.images.map(async (img) => {
+        const imgResponse = await fetch(img.url);
+        const blob = await imgResponse.blob();
+        return new File([blob], img.filename, { type: blob.type });
+      });
+
+      const loadedFiles = await Promise.all(filePromises);
+      setFiles(loadedFiles);
+      alert(`✅ Loaded ${loadedFiles.length} images from R2 folder`);
+
     } catch (error) {
-      console.error("❌ Error uploading to Airtable:", error);
-      alert(error.message || "Upload failed.");
+      console.error('❌ Error loading images from R2:', error);
+      alert('Failed to load images: ' + error.message);
     } finally {
-      setIsUploading(false);
+      setLoadingImages(false);
     }
   };
 
@@ -161,34 +158,38 @@ function App() {
       <h1>{currentPackage.title}</h1>
       <p>{currentPackage.description}</p>
 
-      <div style={{ marginBottom: '2rem', border: '1px solid #ccc', padding: '1rem' }}>
-        <input
-          type="text"
-          placeholder="Your Name"
-          value={name}
-          onChange={e => setName(e.target.value)}
-          style={{ padding: '0.5rem', width: '300px', display: 'block', marginBottom: '0.5rem' }}
-        />
+      <div style={{ marginBottom: '2rem', border: '2px solid #4CAF50', padding: '1rem', borderRadius: '8px' }}>
+        <h3 style={{ marginTop: 0 }}>Load Images from R2</h3>
         <input
           type="email"
-          placeholder="Your Email"
+          placeholder="Your Email (e.g., martin_wrede@web.de)"
           value={email}
           onChange={e => setEmail(e.target.value)}
           style={{ padding: '0.5rem', width: '300px', display: 'block', marginBottom: '0.5rem' }}
         />
-        <input
-          type="file"
-          multiple
-          onChange={handleFileChange}
-          style={{ padding: '0.5rem', display: 'block', marginBottom: '0.5rem' }}
-        />
         <button
-          onClick={handleUpload}
-          disabled={isUploading}
-          style={{ padding: '0.5rem 1rem', marginTop: '0.5rem' }}
+          onClick={loadImagesFromR2}
+          disabled={loadingImages || !email}
+          style={{
+            padding: '0.5rem 1rem',
+            marginTop: '0.5rem',
+            backgroundColor: '#4CAF50',
+            color: 'white',
+            border: 'none',
+            cursor: loadingImages || !email ? 'not-allowed' : 'pointer',
+            opacity: loadingImages || !email ? 0.6 : 1
+          }}
         >
-          {isUploading ? 'Uploading...' : 'Upload'}
+          {loadingImages ? 'Loading...' : '📂 Find Folder'}
         </button>
+        <p style={{ fontSize: '0.8rem', color: '#666', marginTop: '0.5rem', marginBottom: 0 }}>
+          Will load images from R2 folder: <strong>{email ? email.replace(/[^a-zA-Z0-9]/g, '_') : 'your_email'}</strong>
+        </p>
+        {files.length > 0 && (
+          <p style={{ fontSize: '0.9rem', color: '#4CAF50', marginTop: '0.5rem', marginBottom: 0 }}>
+            ✅ {files.length} images loaded
+          </p>
+        )}
       </div>
 
       {/** AI image gneration starts here */}
