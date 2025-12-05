@@ -17,6 +17,9 @@ function App() {
   const [variationCount, setVariationCount] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
   const [loadingImages, setLoadingImages] = useState(false);
+  const [batchProcessing, setBatchProcessing] = useState(false);
+  const [batchProgress, setBatchProgress] = useState({ current: 0, total: 0 });
+  const [batchResults, setBatchResults] = useState([]);
 
   // Get package from URL query parameter
   const queryParams = new URLSearchParams(window.location.search);
@@ -150,6 +153,70 @@ function App() {
     } finally {
       setIsLoading(false);
     }
+  };
+
+
+  // Modify all images with the same prompt
+  const modifyAllImages = async () => {
+    if (!prompt || prompt.trim() === '') {
+      alert("Please enter a prompt to describe the modification.");
+      return;
+    }
+
+    if (files.length === 0) {
+      alert("No images loaded. Please load images first.");
+      return;
+    }
+
+    setBatchProcessing(true);
+    setBatchProgress({ current: 0, total: files.length });
+    const allResults = [];
+
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      setBatchProgress({ current: i + 1, total: files.length });
+
+      try {
+        console.log(`📤 Processing ${i + 1}/${files.length}: ${file.name}`);
+
+        const formData = new FormData();
+        formData.append('prompt', prompt);
+        formData.append('image', file, file.name);
+        formData.append('email', email);
+        formData.append('count', variationCount);
+        formData.append('user', 'User123');
+
+        const response = await fetch('/ai', {
+          method: 'POST',
+          body: formData,
+        });
+
+        if (!response.ok) {
+          throw new Error(`Failed to process ${file.name}`);
+        }
+
+        const data = await response.json();
+        const imageUrls = data.data || [];
+
+        allResults.push({
+          originalName: file.name,
+          prompt: prompt,
+          results: imageUrls,
+        });
+
+      } catch (error) {
+        console.error(`Error processing ${file.name}:`, error);
+        allResults.push({
+          originalName: file.name,
+          prompt: prompt,
+          error: error.message,
+        });
+      }
+    }
+
+    setBatchResults(allResults);
+    setBatchProcessing(false);
+    alert(`✅ Batch processing complete! Processed ${allResults.length} images.`);
   };
 
 
@@ -309,6 +376,57 @@ function App() {
         {isLoading ? 'Processing...' : 'Modify Image with Gemini'}
       </button>
 
+
+      {files.length > 1 && (
+        <button
+          onClick={modifyAllImages}
+          disabled={batchProcessing || !prompt}
+          style={{ 
+            marginLeft: '1rem', 
+            padding: '0.5rem 1rem',
+            backgroundColor: '#FF9800',
+            color: 'white',
+            border: 'none',
+            cursor: batchProcessing || !prompt ? 'not-allowed' : 'pointer',
+            opacity: batchProcessing || !prompt ? 0.6 : 1
+          }}
+        >
+          {batchProcessing 
+            ? `Processing ${batchProgress.current}/${batchProgress.total}...`
+            : `🚀 Modify All ${files.length} Images`
+          }
+        </button>
+      )}
+
+      {/* Progress Bar for Batch Processing */}
+      {batchProcessing && (
+        <div style={{ marginTop: '1rem' }}>
+          <div style={{
+            width: '100%',
+            height: '25px',
+            backgroundColor: '#f0f0f0',
+            borderRadius: '12px',
+            overflow: 'hidden'
+          }}>
+            <div style={{
+              width: `${(batchProgress.current / batchProgress.total) * 100}%`,
+              height: '100%',
+              backgroundColor: '#FF9800',
+              transition: 'width 0.3s',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: 'white',
+              fontWeight: 'bold',
+              fontSize: '0.9rem'
+            }}>
+              {Math.round((batchProgress.current / batchProgress.total) * 100)}%
+            </div>
+          </div>
+        </div>
+      )}
+
+
       {results.length > 0 && (
         <div style={{ marginTop: '2rem' }}>
           <h3>Generated Image{results.length > 1 ? 's' : ''}:</h3>
@@ -335,6 +453,61 @@ function App() {
           </div>
         </div>
       )}
+
+
+      {/* Batch Results */}
+      {batchResults.length > 0 && (
+        <div style={{ marginTop: '3rem' }}>
+          <h2>🎉 Batch Results ({batchResults.length} images processed)</h2>
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
+            gap: '1.5rem',
+            marginTop: '1rem'
+          }}>
+            {batchResults.map((result, index) => (
+              <div key={index} style={{ 
+                border: '2px solid #FF9800', 
+                padding: '1rem', 
+                borderRadius: '8px',
+                backgroundColor: '#fff'
+              }}>
+                <h4 style={{ margin: '0 0 0.5rem 0', color: '#FF9800' }}>
+                  {result.originalName}
+                </h4>
+                <p style={{ fontSize: '0.8rem', color: '#666', margin: '0 0 0.5rem 0' }}>
+                  Prompt: {result.prompt}
+                </p>
+                {result.error ? (
+                  <p style={{ color: 'red', fontSize: '0.9rem' }}>❌ Error: {result.error}</p>
+                ) : (
+                  <div style={{ 
+                    display: 'grid', 
+                    gridTemplateColumns: result.results.length === 1 ? '1fr' : 'repeat(2, 1fr)', 
+                    gap: '0.5rem' 
+                  }}>
+                    {result.results.map((img, imgIndex) => (
+                      <div key={imgIndex}>
+                        <img
+                          src={img.url}
+                          alt={`Result ${imgIndex + 1}`}
+                          style={{ width: '100%', height: 'auto', borderRadius: '4px' }}
+                        />
+                        {result.results.length > 1 && (
+                          <p style={{ fontSize: '0.7rem', textAlign: 'center', margin: '0.25rem 0 0 0' }}>
+                            Variation {imgIndex + 1}
+                          </p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
 
     </div>
   );
