@@ -85,9 +85,15 @@ function App() {
         return;
       }
 
+      if (!prompt || prompt.trim() === '') {
+        alert("Please enter a prompt to describe the modification.");
+        setIsLoading(false);
+        return;
+      }
+
       const formData = new FormData();
       formData.append('prompt', prompt);
-      formData.append('image', selectedFile);
+      formData.append('image', selectedFile, selectedFile.name);
       formData.append('email', email);
       formData.append('count', variationCount);
       formData.append('user', 'User123');
