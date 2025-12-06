@@ -9,6 +9,61 @@ function Automation() {
     const [variationCount, setVariationCount] = useState(1);
     const [results, setResults] = useState([]);
 
+    // New state for Airtable integration
+    const [airtableRecords, setAirtableRecords] = useState([]);
+    const [loadingAirtable, setLoadingAirtable] = useState(false);
+    const [selectedRecord, setSelectedRecord] = useState(null);
+
+    // Load records from Airtable
+    const loadFromAirtable = async () => {
+        setLoadingAirtable(true);
+        try {
+            const response = await fetch('/fetch-airtable-data', {
+                method: 'GET',
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to fetch Airtable records');
+            }
+
+            const data = await response.json();
+            setAirtableRecords(data.records || []);
+
+            if (data.records.length === 0) {
+                alert('No records found in Airtable table');
+            }
+        } catch (error) {
+            console.error('Error loading Airtable records:', error);
+            alert('Failed to load Airtable records: ' + error.message);
+        } finally {
+            setLoadingAirtable(false);
+        }
+    };
+
+    // Select an Airtable record and load its images
+    const selectAirtableRecord = async (record) => {
+        setSelectedRecord(record);
+        setEmail(record.email);
+
+        // Load images from Image_Upload or Image_Upload2 fields
+        const imageUrls = [...(record.imageUpload || []), ...(record.imageUpload2 || [])];
+
+        if (imageUrls.length === 0) {
+            alert('This record has no images');
+            return;
+        }
+
+        // Transform Airtable image format to our format
+        const imagesWithPrompts = imageUrls.map((img, index) => ({
+            url: img.url,
+            filename: img.filename || `image_${index + 1}.jpg`,
+            prompt: record.prompt || '', // Use record's prompt as default
+            id: Math.random().toString(36),
+        }));
+
+        setImages(imagesWithPrompts);
+    };
+
     // Load images from R2
     const loadImages = async () => {
         if (!email) {
@@ -139,8 +194,91 @@ function Automation() {
             <h1>🤖 R2 Batch Automation</h1>
             <p>Process images from your R2 storage automatically</p>
 
+            {/* Airtable Records Section */}
+            <div style={{ marginBottom: '2rem', padding: '1rem', border: '2px solid #2196F3', borderRadius: '8px', backgroundColor: '#f0f8ff' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                    <h2 style={{ margin: 0 }}>📊 Load from Airtable</h2>
+                    <button
+                        onClick={loadFromAirtable}
+                        disabled={loadingAirtable}
+                        style={{
+                            padding: '0.5rem 1rem',
+                            backgroundColor: '#2196F3',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '4px',
+                            cursor: loadingAirtable ? 'wait' : 'pointer',
+                            opacity: loadingAirtable ? 0.6 : 1
+                        }}
+                    >
+                        {loadingAirtable ? 'Loading...' : '🔄 Load Records'}
+                    </button>
+                </div>
+
+                {airtableRecords.length > 0 && (
+                    <div style={{ maxHeight: '400px', overflowY: 'auto', border: '1px solid #ddd', borderRadius: '4px' }}>
+                        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                            <thead style={{ backgroundColor: '#2196F3', color: 'white', position: 'sticky', top: 0 }}>
+                                <tr>
+                                    <th style={{ padding: '0.75rem', textAlign: 'left' }}>Email</th>
+                                    <th style={{ padding: '0.75rem', textAlign: 'left' }}>Package</th>
+                                    <th style={{ padding: '0.75rem', textAlign: 'left' }}>User</th>
+                                    <th style={{ padding: '0.75rem', textAlign: 'left' }}>Timestamp</th>
+                                    <th style={{ padding: '0.75rem', textAlign: 'center' }}>Images</th>
+                                    <th style={{ padding: '0.75rem', textAlign: 'center' }}>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {airtableRecords.map((record, index) => (
+                                    <tr
+                                        key={record.id}
+                                        style={{
+                                            backgroundColor: selectedRecord?.id === record.id ? '#e3f2fd' : index % 2 === 0 ? '#fff' : '#f9f9f9',
+                                            borderBottom: '1px solid #ddd'
+                                        }}
+                                    >
+                                        <td style={{ padding: '0.75rem', fontSize: '0.9rem' }}>{record.email}</td>
+                                        <td style={{ padding: '0.75rem', fontSize: '0.9rem' }}>{record.orderPackage}</td>
+                                        <td style={{ padding: '0.75rem', fontSize: '0.9rem' }}>{record.user}</td>
+                                        <td style={{ padding: '0.75rem', fontSize: '0.9rem' }}>
+                                            {record.timestamp ? new Date(record.timestamp).toLocaleString() : 'N/A'}
+                                        </td>
+                                        <td style={{ padding: '0.75rem', textAlign: 'center', fontSize: '0.9rem' }}>
+                                            {(record.imageUpload?.length || 0) + (record.imageUpload2?.length || 0)}
+                                        </td>
+                                        <td style={{ padding: '0.75rem', textAlign: 'center' }}>
+                                            <button
+                                                onClick={() => selectAirtableRecord(record)}
+                                                style={{
+                                                    padding: '0.4rem 0.8rem',
+                                                    backgroundColor: selectedRecord?.id === record.id ? '#4CAF50' : '#2196F3',
+                                                    color: 'white',
+                                                    border: 'none',
+                                                    borderRadius: '4px',
+                                                    cursor: 'pointer',
+                                                    fontSize: '0.85rem'
+                                                }}
+                                            >
+                                                {selectedRecord?.id === record.id ? '✓ Selected' : 'Select'}
+                                            </button>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                )}
+
+                {airtableRecords.length === 0 && !loadingAirtable && (
+                    <p style={{ textAlign: 'center', color: '#666', margin: '1rem 0' }}>
+                        Click "Load Records" to fetch data from Airtable
+                    </p>
+                )}
+            </div>
+
             {/* Email Input */}
             <div style={{ marginBottom: '2rem', padding: '1rem', border: '2px solid #4CAF50', borderRadius: '8px' }}>
+                <h3 style={{ marginTop: 0 }}>📧 Or Load from R2 Manually</h3>
                 <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold' }}>
                     Your Email:
                 </label>
