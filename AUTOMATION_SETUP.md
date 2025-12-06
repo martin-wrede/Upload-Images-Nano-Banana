@@ -33,7 +33,7 @@ WORKER_URL=https://upload-images-nano-banana-auto.pages.dev
 
 ### `DEFAULT_FOOD_PROMPT`
 - **Type**: String
-- **Default**: "Professional food photography, high quality, well-lit, appetizing presentation, restaurant quality"
+- **Default**: "Ein professionelles Food-Fotografie-Bild:  Kamera-Perspektive: leicht erhöhte Draufsicht, etwa 30–45° von oben. Objektiv: Normalobjektiv, 50 mm Vollformat-Look. Der Teller vervollständigen, Hintergrund sanft unscharf (Bokeh). Komposition klar und appetitlich, alle Speisen vollständig sichtbar. Keine störenden Objekte wie Dosen, Serviettenhalter oder Salzstreuer im Bild. Beleuchtung: weiches, diffuses Licht wie aus einer großen Lichtwanne, natürliche Reflexe, zarte Schatten. Farben lebendig, aber realistisch; leichte Food-Styling-Ästhetik; knackige Details, hohe Schärfe, professioneller Look. Ultra-realistischer Stil, hochwertige Food-Photography"
 - **Description**: Default prompt that will be prepended to client prompts
 - **Example**: If client prompt is "make colors vibrant", final prompt becomes: "Professional food photography... make colors vibrant"
 
